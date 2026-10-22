@@ -1,0 +1,447 @@
+-- CLOVER ELEMENTS | Kill Aura de treino
+-- Uso autorizado: NPCs de treino no seu proprio jogo Roblox.
+-- Cole em um executor apenas no ambiente de teste que voce controla.
+--
+-- IMPORTANTE:
+-- Este arquivo cria a interface, encontra NPCs proximos e solicita ataques
+-- por um RemoteEvent chamado ReplicatedStorage.CloverAttackRequest.
+-- Para causar dano real, o SEU jogo precisa ter um Script no servidor que
+-- valide o alvo/distancia e processe esse RemoteEvent. Um cliente sozinho
+-- nao deve decidir dano nem consegue garantir dano replicado ao servidor.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+if not player then return end
+
+local playerGui = player:WaitForChild("PlayerGui")
+local old = playerGui:FindFirstChild("CloverElements_KillAura")
+if old then old:Destroy() end
+
+local COLORS = {
+    bg = Color3.fromRGB(7, 13, 11),
+    panel = Color3.fromRGB(13, 25, 20),
+    green = Color3.fromRGB(16, 185, 129),
+    bright = Color3.fromRGB(52, 211, 153),
+    gold = Color3.fromRGB(244, 208, 63),
+    white = Color3.fromRGB(245, 250, 247),
+    dim = Color3.fromRGB(145, 170, 157),
+    red = Color3.fromRGB(255, 100, 100)
+}
+
+local function make(className, props, parent)
+    local obj = Instance.new(className)
+    for k, v in pairs(props or {}) do
+        obj[k] = v
+    end
+    obj.Parent = parent
+    return obj
+end
+
+local function round(obj, px)
+    make("UICorner", {CornerRadius = UDim.new(0, px or 10)}, obj)
+end
+
+local gui = make("ScreenGui", {
+    Name = "CloverElements_KillAura",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    DisplayOrder = 999,
+}, playerGui)
+
+local openBtn = make("TextButton", {
+    Name = "FloatingButton",
+    Size = UDim2.fromOffset(58, 58),
+    Position = UDim2.new(0, 18, 0.5, -29),
+    BackgroundColor3 = COLORS.panel,
+    Text = "🍀",
+    TextSize = 28,
+    TextColor3 = COLORS.gold,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+}, gui)
+round(openBtn, 29)
+local openStroke = make("UIStroke", {Color = COLORS.green, Thickness = 2}, openBtn)
+
+local panel = make("Frame", {
+    Name = "Main",
+    Size = UDim2.fromOffset(330, 282),
+    Position = UDim2.new(0.5, -165, 0.5, -141),
+    BackgroundColor3 = COLORS.bg,
+    BorderSizePixel = 0,
+    Visible = true,
+}, gui)
+round(panel, 15)
+make("UIStroke", {Color = COLORS.green, Thickness = 1.5}, panel)
+
+local header = make("Frame", {
+    Size = UDim2.new(1, 0, 0, 58),
+    BackgroundColor3 = COLORS.panel,
+    BorderSizePixel = 0,
+}, panel)
+round(header, 15)
+
+make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(15, 7),
+    Size = UDim2.new(1, -60, 0, 27),
+    Text = "🍀 CLOVER ELEMENTS",
+    TextColor3 = COLORS.gold,
+    TextSize = 18,
+    Font = Enum.Font.GothamBlack,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, header)
+
+make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(16, 32),
+    Size = UDim2.new(1, -60, 0, 16),
+    Text = "TRAINING COMBAT",
+    TextColor3 = COLORS.dim,
+    TextSize = 10,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, header)
+
+local closeBtn = make("TextButton", {
+    Size = UDim2.fromOffset(30, 30),
+    Position = UDim2.new(1, -40, 0, 14),
+    BackgroundColor3 = COLORS.bg,
+    Text = "×",
+    TextColor3 = COLORS.white,
+    TextSize = 21,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+}, header)
+round(closeBtn, 8)
+
+local status = make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(18, 75),
+    Size = UDim2.new(1, -36, 0, 22),
+    Text = "STATUS: DESATIVADO",
+    TextColor3 = COLORS.dim,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, panel)
+
+local auraBtn = make("TextButton", {
+    Position = UDim2.fromOffset(18, 105),
+    Size = UDim2.new(1, -36, 0, 45),
+    BackgroundColor3 = COLORS.panel,
+    Text = "KILL AURA  •  OFF",
+    TextColor3 = COLORS.white,
+    TextSize = 15,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+}, panel)
+round(auraBtn, 10)
+local auraStroke = make("UIStroke", {Color = COLORS.green, Thickness = 1}, auraBtn)
+
+local rangeLabel = make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(18, 155),
+    Size = UDim2.new(1, -36, 0, 20),
+    Text = "ALCANCE: 12 STUDS",
+    TextColor3 = COLORS.white,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, panel)
+
+local rangeBar = make("Frame", {
+    Position = UDim2.fromOffset(18, 180),
+    Size = UDim2.new(1, -36, 0, 8),
+    BackgroundColor3 = Color3.fromRGB(35, 52, 44),
+    BorderSizePixel = 0,
+}, panel)
+round(rangeBar, 5)
+
+local rangeFill = make("Frame", {
+    Size = UDim2.new(0.25, 0, 1, 0),
+    BackgroundColor3 = COLORS.green,
+    BorderSizePixel = 0,
+}, rangeBar)
+round(rangeFill, 5)
+
+local knob = make("TextButton", {
+    Size = UDim2.fromOffset(18, 18),
+    Position = UDim2.new(0.25, -9, 0.5, -9),
+    BackgroundColor3 = COLORS.gold,
+    Text = "",
+    AutoButtonColor = false,
+}, rangeBar)
+round(knob, 9)
+
+local boostBtn = make("TextButton", {
+    Position = UDim2.fromOffset(18, 207),
+    Size = UDim2.new(1, -36, 0, 32),
+    BackgroundColor3 = COLORS.panel,
+    Text = "⚡ BOOST SERVE  •  OFF",
+    TextColor3 = COLORS.white,
+    TextSize = 12,
+    Font = Enum.Font.GothamBlack,
+    AutoButtonColor = false,
+}, panel)
+round(boostBtn, 9)
+local boostStroke = make("UIStroke", {Color = COLORS.gold, Thickness = 1}, boostBtn)
+
+local footer = make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position = UDim2.fromOffset(18, 245),
+    Size = UDim2.new(1, -36, 0, 20),
+    Text = "Alvos proximos: 0  |  NPCs em TrainingTargets",
+    TextColor3 = COLORS.dim,
+    TextSize = 10,
+    Font = Enum.Font.Gotham,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, panel)
+
+local enabled = false
+local range = 12
+local targetCount = 0
+local lastSent = 0
+local attackInterval = 0.65
+local draggingRange = false
+local draggingPanel = false
+local dragStart, panelStart
+
+local function setEnabled(value)
+    enabled = value
+    if enabled then
+        auraBtn.Text = "KILL AURA  •  ON"
+        auraBtn.BackgroundColor3 = Color3.fromRGB(10, 75, 51)
+        auraStroke.Color = COLORS.bright
+        status.Text = "STATUS: ATIVO"
+        status.TextColor3 = COLORS.bright
+    else
+        auraBtn.Text = "KILL AURA  •  OFF"
+        auraBtn.BackgroundColor3 = COLORS.panel
+        auraStroke.Color = COLORS.green
+        status.Text = "STATUS: DESATIVADO"
+        status.TextColor3 = COLORS.dim
+    end
+end
+
+-- BOOST SERVE: reduz alguns efeitos visuais locais para aliviar o render.
+-- O ganho de FPS depende do dispositivo e do jogo; nao e garantido.
+local boostEnabled = false
+local savedLighting = {}
+local savedStates = {}
+local savedParts = {}
+
+local function setBoost(value)
+    boostEnabled = value
+    local Lighting = game:GetService("Lighting")
+
+    if boostEnabled then
+        boostBtn.Text = "⚡ BOOST SERVE  •  ON"
+        boostBtn.BackgroundColor3 = Color3.fromRGB(42, 53, 24)
+        boostBtn.TextColor3 = COLORS.gold
+        boostStroke.Color = COLORS.bright
+
+        savedLighting.GlobalShadows = Lighting.GlobalShadows
+        savedLighting.FogEnd = Lighting.FogEnd
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 100000
+
+        for _, obj in ipairs(Lighting:GetChildren()) do
+            if obj:IsA("PostEffect") then
+                savedStates[obj] = obj.Enabled
+                obj.Enabled = false
+            end
+        end
+
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                if not savedParts[obj] then
+                    savedParts[obj] = {Material = obj.Material, Reflectance = obj.Reflectance}
+                end
+                obj.Material = Enum.Material.SmoothPlastic
+                obj.Reflectance = 0
+            elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then
+                if savedStates[obj] == nil then savedStates[obj] = obj.Enabled end
+                obj.Enabled = false
+            end
+        end
+    else
+        boostBtn.Text = "⚡ BOOST SERVE  •  OFF"
+        boostBtn.BackgroundColor3 = COLORS.panel
+        boostBtn.TextColor3 = COLORS.white
+        boostStroke.Color = COLORS.gold
+
+        if savedLighting.GlobalShadows ~= nil then Lighting.GlobalShadows = savedLighting.GlobalShadows end
+        if savedLighting.FogEnd ~= nil then Lighting.FogEnd = savedLighting.FogEnd end
+
+        for obj, previous in pairs(savedStates) do
+            if obj and obj.Parent then
+                pcall(function() obj.Enabled = previous end)
+            end
+        end
+        for obj, previous in pairs(savedParts) do
+            if obj and obj.Parent then
+                pcall(function()
+                    obj.Material = previous.Material
+                    obj.Reflectance = previous.Reflectance
+                end)
+            end
+        end
+
+        table.clear(savedLighting)
+        table.clear(savedStates)
+        table.clear(savedParts)
+    end
+end
+
+boostBtn.MouseButton1Click:Connect(function()
+    setBoost(not boostEnabled)
+end)
+
+local function updateRangeFromX(x)
+    local width = math.max(rangeBar.AbsoluteSize.X, 1)
+    local alpha = math.clamp((x - rangeBar.AbsolutePosition.X) / width, 0, 1)
+    range = math.floor(4 + alpha * 36 + 0.5)
+    rangeFill.Size = UDim2.new(alpha, 0, 1, 0)
+    knob.Position = UDim2.new(alpha, -9, 0.5, -9)
+    rangeLabel.Text = "ALCANCE: " .. range .. " STUDS"
+end
+
+local function getRoot(model)
+    if not model or not model:IsA("Model") then return nil end
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    local root = model:FindFirstChild("HumanoidRootPart")
+    if hum and hum.Health > 0 and root and root:IsA("BasePart") then
+        return root, hum
+    end
+    return nil
+end
+
+local function getClosestTrainingTarget()
+    local char = player.Character
+    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil, 0 end
+
+    local folder = workspace:FindFirstChild("TrainingTargets")
+    if not folder then return nil, 0 end
+
+    local closest, closestDistance = nil, math.huge
+    local count = 0
+
+    for _, model in ipairs(folder:GetChildren()) do
+        local root, hum = getRoot(model)
+        if root and hum and model ~= char then
+            local distance = (root.Position - myRoot.Position).Magnitude
+            if distance <= range then
+                count += 1
+                if distance < closestDistance then
+                    closest, closestDistance = model, distance
+                end
+            end
+        end
+    end
+
+    return closest, count
+end
+
+auraBtn.MouseButton1Click:Connect(function()
+    setEnabled(not enabled)
+end)
+
+openBtn.MouseButton1Click:Connect(function()
+    panel.Visible = not panel.Visible
+    openBtn.Text = panel.Visible and "✕" or "🍀"
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    panel.Visible = false
+    openBtn.Text = "🍀"
+end)
+
+rangeBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingRange = true
+        updateRangeFromX(input.Position.X)
+    end
+end)
+knob.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingRange = true
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if draggingRange and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        updateRangeFromX(input.Position.X)
+    end
+    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        panel.Position = UDim2.new(panelStart.X.Scale, panelStart.X.Offset + delta.X, panelStart.Y.Scale, panelStart.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingRange = false
+        draggingPanel = false
+    end
+end)
+
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingPanel = true
+        dragStart = input.Position
+        panelStart = panel.Position
+    end
+end)
+
+local remote = ReplicatedStorage:FindFirstChild("CloverAttackRequest")
+if not remote or not remote:IsA("RemoteEvent") then
+    status.Text = "STATUS: AGUARDANDO REMOTE DO JOGO"
+end
+
+local connection
+connection = RunService.Heartbeat:Connect(function()
+    if not gui.Parent then
+        if connection then connection:Disconnect() end
+        return
+    end
+    if not enabled then return end
+
+    local target, count = getClosestTrainingTarget()
+    targetCount = count
+    footer.Text = "Alvos proximos: " .. tostring(count) .. "  |  Alcance: " .. range
+
+    if target and os.clock() - lastSent >= attackInterval then
+        remote = ReplicatedStorage:FindFirstChild("CloverAttackRequest")
+        if remote and remote:IsA("RemoteEvent") then
+            lastSent = os.clock()
+            remote:FireServer(target)
+            status.Text = "STATUS: SOLICITANDO ATAQUE"
+            status.TextColor3 = COLORS.bright
+        else
+            status.Text = "STATUS: REMOTE DO SERVIDOR AUSENTE"
+            status.TextColor3 = COLORS.red
+        end
+    elseif not target then
+        status.Text = "STATUS: ATIVO • NENHUM ALVO"
+        status.TextColor3 = COLORS.bright
+    end
+end)
+
+setEnabled(false)
+setBoost(false)
+updateRangeFromX(rangeBar.AbsolutePosition.X + rangeBar.AbsoluteSize.X * ((range - 4) / 36))
+
+-- Brilho suave do botao flutuante
+task.spawn(function()
+    while gui.Parent do
+        local pulse = 1 + math.sin(os.clock() * 2) * 0.35
+        openStroke.Thickness = pulse
+        task.wait(0.08)
+    end
+end)
